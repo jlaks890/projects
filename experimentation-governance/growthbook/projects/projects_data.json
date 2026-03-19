@@ -1,0 +1,230 @@
+{
+  "projects": [
+    {
+      "id": "prj_13cawd4em48n8tih",
+      "name": "Risk",
+      "description": "",
+      "dateCreated": "2024-12-03T15:58:31.529Z",
+      "dateUpdated": "2024-12-03T15:58:31.529Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_16rg0mf3kld3mjlm5",
+      "name": "EON",
+      "description": "",
+      "dateCreated": "2023-01-19T21:48:00.941Z",
+      "dateUpdated": "2023-01-19T21:48:00.941Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_17fo3ula140bo1",
+      "name": "EDI",
+      "description": "",
+      "dateCreated": "2022-11-03T13:34:29.137Z",
+      "dateUpdated": "2022-11-03T13:34:29.137Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_1c17x4em2z3am2j",
+      "name": "F&B",
+      "description": "",
+      "dateCreated": "2024-11-01T18:50:24.955Z",
+      "dateUpdated": "2024-11-01T18:50:24.955Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_1f923mlsf2homf",
+      "name": "Franchise Suite",
+      "description": "Franchise Suite experiment analysis",
+      "dateCreated": "2024-02-09T19:55:28.359Z",
+      "dateUpdated": "2024-02-09T19:55:28.359Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_1lbo3jlsw3s48i",
+      "name": "Conversations",
+      "description": "",
+      "dateCreated": "2024-02-21T18:03:39.762Z",
+      "dateUpdated": "2024-02-21T18:03:39.762Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_1lbo3jlsw3yj5j",
+      "name": "Editorial",
+      "description": "",
+      "dateCreated": "2024-02-21T18:08:39.031Z",
+      "dateUpdated": "2024-02-21T18:08:39.031Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_1m1ll33ldxaocck",
+      "name": "Sandbox",
+      "description": "Test project",
+      "dateCreated": "2023-02-09T16:08:52.100Z",
+      "dateUpdated": "2023-09-11T15:23:44.671Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_1m1ll33ldyk0f6d",
+      "name": "Appointments",
+      "description": "",
+      "dateCreated": "2023-02-10T13:17:58.357Z",
+      "dateUpdated": "2023-02-10T13:17:58.357Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_4k33d3jltoldsgy",
+      "name": "Banking",
+      "description": "",
+      "dateCreated": "2024-03-12T16:33:57.346Z",
+      "dateUpdated": "2024-03-13T18:35:45.578Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_5ch8vg3xlsjgg8wp",
+      "name": "Commerce Platform",
+      "description": "",
+      "dateCreated": "2024-02-12T21:37:20.665Z",
+      "dateUpdated": "2024-02-12T21:37:20.665Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_5hp2z3ulsaqwrju",
+      "name": "DAP",
+      "description": "",
+      "dateCreated": "2024-02-06T19:20:11.898Z",
+      "dateUpdated": "2024-02-06T19:20:11.898Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_5hp2z3ulsc5qg2v",
+      "name": "HEX",
+      "description": "Help Experience",
+      "dateCreated": "2024-02-07T19:02:57.511Z",
+      "dateUpdated": "2024-02-07T19:02:57.511Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_7fcge332ldx821by",
+      "name": "Retail",
+      "description": "",
+      "dateCreated": "2023-02-09T14:55:32.158Z",
+      "dateUpdated": "2023-02-09T14:55:32.158Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_8hg3klvvisucc",
+      "name": "ECOM",
+      "description": "",
+      "dateCreated": "2024-05-06T22:15:28.668Z",
+      "dateUpdated": "2024-05-06T22:15:28.668Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_afv6b232lctbifb4",
+      "name": "GRM ",
+      "description": "",
+      "dateCreated": "2023-01-12T16:41:28.576Z",
+      "dateUpdated": "2023-07-14T19:12:53.331Z",
+      "settings": {
+        "statsEngine": "bayesian"
+      }
+    },
+    {
+      "id": "prj_aooq373hl8anzcrf",
+      "name": "Demand Gen",
+      "description": "",
+      "dateCreated": "2022-09-20T20:44:07.131Z",
+      "dateUpdated": "2022-09-20T20:44:07.131Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_aooq373hl8anzinv",
+      "name": "SPOS",
+      "description": "",
+      "dateCreated": "2022-09-20T20:44:14.779Z",
+      "dateUpdated": "2022-09-20T20:44:14.779Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_auqm319emcc8jona",
+      "name": "Growth",
+      "description": "Growthbook for all Growth-related experiments",
+      "dateCreated": "2025-06-25T17:35:47.590Z",
+      "dateUpdated": "2025-06-25T17:35:47.590Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_c7ato41lefvr587",
+      "name": "EEN",
+      "description": "",
+      "dateCreated": "2023-02-22T16:18:45.943Z",
+      "dateUpdated": "2023-02-22T16:18:45.943Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_e9xiyo42lhrwb8jk",
+      "name": "Marketing - Non US",
+      "description": "",
+      "dateCreated": "2023-05-17T16:06:44.480Z",
+      "dateUpdated": "2023-05-17T16:06:44.480Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_ewvk1hlms1eo64",
+      "name": "Hardware",
+      "description": "",
+      "dateCreated": "2023-09-20T17:47:54.460Z",
+      "dateUpdated": "2023-09-20T17:47:54.460Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_fztzmk43ljrb55y4",
+      "name": "TIDAL",
+      "description": "",
+      "dateCreated": "2023-07-06T15:33:33.916Z",
+      "dateUpdated": "2023-07-06T15:33:33.916Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_k8ch33rlxexcsnf",
+      "name": "Dashboard",
+      "description": "",
+      "dateCreated": "2024-06-14T16:50:13.899Z",
+      "dateUpdated": "2024-06-14T16:50:13.899Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_m6dmf47ljpwdlhx",
+      "name": "Invoices & Bill Pay",
+      "description": "",
+      "dateCreated": "2023-07-05T15:52:26.901Z",
+      "dateUpdated": "2024-02-27T16:06:21.624Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_org_1ivjbs3wl7s1r4of_demo-datasource-project",
+      "name": "Sample Data",
+      "description": "",
+      "dateCreated": "2024-03-13T18:51:55.781Z",
+      "dateUpdated": "2024-03-13T18:51:55.781Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_qzd2xlog656ya",
+      "name": "Square Staff",
+      "description": "",
+      "dateCreated": "2023-11-01T19:46:40.882Z",
+      "dateUpdated": "2023-11-01T19:46:40.882Z",
+      "settings": {}
+    },
+    {
+      "id": "prj_zsd3m32m2dj78gs",
+      "name": "Customer Engagement",
+      "description": "",
+      "dateCreated": "2024-10-17T16:44:45.340Z",
+      "dateUpdated": "2024-10-17T16:44:45.340Z",
+      "settings": {}
+    }
+  ]
+}

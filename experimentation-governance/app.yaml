@@ -1,0 +1,21 @@
+command: ['streamlit', 'run', 'app.py']
+
+env:
+  - name: PIP_EXTRA_INDEX_URL
+    value: https://global.block-artifacts.com/artifactory/api/pypi/block-pypi/simple
+  - name: PIP_NATIVE_TLS
+    value: "true"
+  - name: GROWTHBOOK_API_HOST
+    value: "https://growthbook.sqprod.co"
+  - name: GITHUB_REDIRECT_URI
+    value: "https://metric-governance-app-2736046192934091.aws.databricksapps.com"
+  - name: GITHUB_REPO_OWNER
+    value: "squareup"
+  - name: GITHUB_REPO_NAME
+    value: "forge-sq-experimentation"
+  - name: GITHUB_CLIENT_ID
+    valueFrom: github_client_id_resource
+  - name: GITHUB_CLIENT_SECRET
+    valueFrom: github_client_secret_resource
+  - name: GROWTHBOOK_PAT
+    valueFrom: growthbook_pat_resource

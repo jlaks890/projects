@@ -1,0 +1,112 @@
+{
+  "metrics": [
+    {
+      "name": "Signups",
+      "description": "[go/glossary](https://wiki.sqprod.co/display/marketingdataeng/Full+Funnel+Attribution+Data+Dictionary): The merchant account creation event which is logged when a visitor enters an email and password for the first time on squareup.com.\n\n[Documentation for app_bi.hexagon.vfact_signups](https://wiki.sqprod.co/display/bi/app_bi.hexagon.vfact_signups)",
+      "owner": "Sophia Montalvan",
+      "type": "binomial",
+      "projects": [
+        "Public Web"
+      ],
+      "sql": "select\n  merchant_token,\n  signup_at as timestamp\nfrom app_marketing.public.vfact_signups",
+      "dateCreated": "2025-12-02",
+      "dateUpdated": "2025-12-02",
+      "archived": false,
+      "tags": [],
+      "userIdTypes": [
+        "merchant_token"
+      ],
+      "behavior": {
+        "goal": "increase",
+        "windowSettings": {
+          "type": "none",
+          "windowValue": 168,
+          "windowUnit": "hours",
+          "delayValue": 0,
+          "delayUnit": "hours"
+        }
+      }
+    },
+    {
+      "name": "Any Hardware Return (non-warranty)",
+      "description": "Merchants who submitted a hardware return, non-warranty related",
+      "owner": "Jonathan Laks",
+      "type": "binomial",
+      "projects": [
+        "Hardware"
+      ],
+      "sql": "SELECT \n  pentagon_merchant_token AS merchant_token\n  , TIMESTAMP_FROM_PARTS(return_created_date,TO_TIME('23:59:59')) AS timestamp\nFROM app_hardware.hdm.fact_return_item\nWHERE is_warranty_order = FALSE\n  AND return_created_date IS NOT NULL\n  AND return_created_date >= '{{ startDate }}'\n",
+      "dateCreated": "2025-12-02",
+      "dateUpdated": "2025-12-02",
+      "archived": false,
+      "tags": [],
+      "userIdTypes": [
+        "merchant_token"
+      ],
+      "behavior": {
+        "goal": "increase",
+        "windowSettings": {
+          "type": "none",
+          "windowValue": 35,
+          "windowUnit": "days",
+          "delayValue": 0,
+          "delayUnit": "hours"
+        }
+      }
+    },
+    {
+      "name": "Any Shop 1P Hardware Purchase",
+      "description": "Merchants who completed a Shop order with a at least 1 1P hardware unit",
+      "owner": "Jonathan Laks",
+      "type": "binomial",
+      "projects": [
+        "Hardware"
+      ],
+      "sql": "SELECT DISTINCT\n  fsl.pentagon_merchant_token AS merchant_token\n  , fsl.created_at AS timestamp\nFROM app_hardware.hdm.fact_shop_line_item fsl\nWHERE product_reader_type LIKE ANY ('R4%', 'R12','S1', 'S3', 'T2', 'X2', 'T3')\n  AND created_date >= '{{ startDate }}' \n  AND is_warranty_order = 0",
+      "dateCreated": "2025-12-02",
+      "dateUpdated": "2025-12-02",
+      "archived": false,
+      "tags": [],
+      "userIdTypes": [
+        "merchant_token"
+      ],
+      "behavior": {
+        "goal": "increase",
+        "windowSettings": {
+          "type": "none",
+          "windowValue": 35,
+          "windowUnit": "days",
+          "delayValue": 0,
+          "delayUnit": "hours"
+        }
+      }
+    },
+    {
+      "name": "Completed IDV Successfully (BI Definition)",
+      "description": "Merchants who successfully passed IDV ",
+      "owner": "Matias Razuri",
+      "type": "binomial",
+      "projects": [
+        "GRM "
+      ],
+      "sql": "SELECT du.merchant_token\n    , du.first_successful_activation_request_approved_at AS timestamp\nFROM app_bi.hexagon.vdim_user du\nWHERE 1=1\n    AND du.is_merchant = 1\n    AND du.first_successful_activation_request_approved_at <> '9999-09-09 00:00:00.000'",
+      "dateCreated": "2025-12-02",
+      "dateUpdated": "2025-12-02",
+      "archived": false,
+      "tags": [],
+      "userIdTypes": [
+        "merchant_token"
+      ],
+      "behavior": {
+        "goal": "increase",
+        "windowSettings": {
+          "type": "none",
+          "windowValue": 17,
+          "windowUnit": "days",
+          "delayValue": 0,
+          "delayUnit": "hours"
+        }
+      }
+    }
+  ]
+}
