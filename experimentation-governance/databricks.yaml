@@ -1,0 +1,9 @@
+bundle:
+  name: metric-governance-app
+
+resources:
+  apps:
+    metric-governance-app:
+      name: metric-governance-app
+      description: "Square Metric Governance App"
+      source_code_path: .
