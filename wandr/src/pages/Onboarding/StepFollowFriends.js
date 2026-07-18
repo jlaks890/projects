@@ -1,10 +1,20 @@
+import { useState, useEffect } from 'react';
 import Avatar from '../../components/Avatar';
-import { USERS } from '../../data';
-
-// All users except id '1' (the current user) are candidates to follow
-const FOLLOWABLE_USERS = USERS.filter(u => u.id !== '1');
+import { useAuth } from '../../context/AuthContext';
+import { fetchUsers } from '../../services/users';
 
 export default function StepFollowFriends({ data, onChange }) {
+  const { user } = useAuth();
+  const [candidates, setCandidates] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchUsers().then(users => {
+      if (!cancelled) setCandidates(users.filter(u => u.id !== user?.id && u.id !== '1'));
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   const toggle = (id) => {
     const following = data.following.includes(id)
       ? data.following.filter(f => f !== id)
@@ -18,7 +28,7 @@ export default function StepFollowFriends({ data, onChange }) {
       <div className="onboarding-title">Follow your first friends</div>
       <div className="onboarding-sub">See where the people you know are traveling</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-        {FOLLOWABLE_USERS.map(u => {
+        {candidates.map(u => {
           const isFollowing = data.following.includes(u.id);
           return (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', background: 'var(--bg3)', borderRadius: 'var(--r)', border: '1px solid var(--border)' }}>

@@ -3,6 +3,7 @@ import './styles.css';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
@@ -15,10 +16,12 @@ import PeoplePage from './pages/People';
 import PublicProfilePage from './pages/PublicProfile';
 import LoginPage from './pages/Login';
 import OnboardingPage from './pages/Onboarding';
+import SettingsPage from './pages/Settings';
 
 // Requires auth + complete profile
 function PrivateRoute({ children }) {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+  if (loading) return null; // restoring Supabase session
   if (!user) return <Navigate to="/login" replace />;
   if (!profile) return <Navigate to="/onboarding" replace />;
   return children;
@@ -26,7 +29,8 @@ function PrivateRoute({ children }) {
 
 // Requires auth but no profile yet (onboarding)
 function OnboardingRoute({ children }) {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (profile) return <Navigate to="/" replace />;
   return children;
@@ -52,6 +56,7 @@ function AppRoutes() {
         <Route path="/trips" element={<TripsPage />} />
         <Route path="/people" element={<PeoplePage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/user/:username" element={<PublicProfilePage />} />
       </Route>
 
@@ -64,11 +69,13 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-        </ToastProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

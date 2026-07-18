@@ -1,7 +1,43 @@
 # Wandr Backend Setup Guide
 
 This doc covers how to connect Wandr to a real database when you're ready.
-Currently all data lives in `src/data.js` as static arrays — this is the plan to replace that.
+
+---
+
+## ✅ Status (July 2026): code side is done — 2 manual steps remain
+
+The app is fully wired for Supabase. Every page loads data through
+`src/services/` (async), which query Supabase when configured and fall back to
+the static seed data in `src/data.js` when not. `@supabase/supabase-js` is
+installed and `src/lib/supabase.js` is active.
+
+**To switch from static data to a real database:**
+
+1. **Create a free Supabase project** at https://supabase.com (pick a nearby
+   region). In the SQL Editor, run `supabase/schema.sql`, then
+   `supabase/seed.sql` (in that order).
+2. **Add your keys** to `.env.local` (Settings → API in the Supabase dashboard),
+   then restart `npm start`:
+   ```
+   REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+   REACT_APP_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+To log in as the seeded "You" account: create an email/password user in
+Supabase (Authentication → Users → Add user) and run the "claim the seed
+account" snippet at the bottom of `supabase/seed.sql`. Google OAuth needs
+Google Cloud OAuth credentials configured in Supabase (Authentication →
+Providers → Google) — email/password is the fastest path for testing.
+
+**Roadmap after connection** (details in `frontend-flows.md` / `vision.md`):
+1. Follow/unfollow + trip creation/editing writes (services already expose
+   `followUser`, `createTrip`, `updateItinerary` — UI wiring is next)
+2. Public share links via `trips.share_token` (column already in schema)
+3. Comments table + notifications
+4. Normalize itinerary jsonb into `trip_stops` when auto-detection needs
+   per-stop timestamps (`arrived_at` / `departed_at`)
+
+The sections below are the original design notes.
 
 ---
 
