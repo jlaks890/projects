@@ -1,20 +1,39 @@
 import { useState } from 'react';
-import { CATEGORIES, MAP_PINS } from '../../data';
+import { CATEGORIES, EXPLORE_PLACES } from '../../data';
 import Map from '../../components/Map';
+import { useToast } from '../../context/ToastContext';
+import { isExploreSaved, setExploreSaved } from '../../services/saves';
+
+const DEFAULT_CENTER = { lat: 37.787, lng: -122.43 };
 
 export default function ExplorePage() {
   const [activeFilter, setActiveFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [savedIds, setSavedIds] = useState(
+    () => new Set(EXPLORE_PLACES.filter(p => isExploreSaved(p.id)).map(p => p.id))
+  );
+  const [focus, setFocus] = useState(null); // {lat, lng} of the selected place
+  const { showToast } = useToast();
 
-  const pins = activeFilter === 'all' ? MAP_PINS : MAP_PINS.filter(p => p.category === activeFilter);
+  const q = query.trim().toLowerCase();
+  const places = EXPLORE_PLACES
+    .filter(p => activeFilter === 'all' || p.category === activeFilter)
+    .filter(p => !q || p.name.toLowerCase().includes(q) || p.sub.toLowerCase().includes(q));
 
-  const places = [
-    { emoji: '🍜', name: 'Mensho Tokyo Ramen', sub: 'Food · Japantown · 0.8mi', friends: 12, verified: true, bg: '#2a1a0e', category: 'food' },
-    { emoji: '☕', name: 'Tartine Manufactory', sub: 'Coffee · Mission · 1.2mi', friends: 18, verified: true, bg: '#1a1200', category: 'food' },
-    { emoji: '🌉', name: 'Golden Gate Bridge', sub: 'Nature · Presidio · 3mi', friends: 44, verified: true, bg: '#0a1520', category: 'nature' },
-    { emoji: '🎨', name: 'SFMOMA', sub: 'Culture · SoMa · 0.5mi', friends: 9, verified: true, bg: '#0a0a1a', category: 'culture' },
-    { emoji: '🛍', name: 'Haight-Ashbury Vintage', sub: 'Shopping · Haight · 2mi', friends: 6, verified: false, bg: '#1a0a1a', category: 'shopping' },
-    { emoji: '🍸', name: 'Trick Dog', sub: 'Nightlife · Mission · 1.5mi', friends: 15, verified: true, bg: '#0a0a0a', category: 'nightlife' },
-  ].filter(p => activeFilter === 'all' || p.category === activeFilter);
+  const pins = places.map(p => ({ id: p.id, emoji: p.emoji, lat: p.lat, lng: p.lng, label: p.name, category: p.category }));
+
+  const toggleSave = (e, place) => {
+    e.stopPropagation();
+    const saved = savedIds.has(place.id);
+    const next = new Set(savedIds);
+    if (saved) next.delete(place.id);
+    else next.add(place.id);
+    setSavedIds(next);
+    setExploreSaved(place.id, !saved); // shows up under Profile → Places
+    showToast(saved ? 'Removed from saved' : `✓ Saved ${place.name} — see Profile → Places`);
+  };
+
+  const focusPlace = (place) => setFocus({ lat: place.lat, lng: place.lng });
 
   return (
     <div className="page active" id="page-explore">
@@ -22,7 +41,12 @@ export default function ExplorePage() {
         <div className="explore-left">
           <div className="section-heading">Explore</div>
           <div className="section-sub">Discover where your friends have been</div>
-          <div className="search-bar">🔍 Search places, cities, food...</div>
+          <input
+            className="search-bar"
+            placeholder="🔍 Search places, cities, food..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
           <div className="filter-row">
             <button className={`filter-chip${activeFilter === 'all' ? ' active' : ''}`} onClick={() => setActiveFilter('all')}>All</button>
             {CATEGORIES.map(c => (
@@ -32,20 +56,31 @@ export default function ExplorePage() {
             ))}
           </div>
           {places.map(p => (
-            <div className="place-card" key={p.name}>
+            <div className="place-card" key={p.id} onClick={() => focusPlace(p)}>
               <div className="p-thumb" style={{ background: p.bg }}>{p.emoji}</div>
               <div style={{ flex: 1 }}>
                 <div className="p-name">{p.name}{p.verified && <span className="verified"> ✓</span>}</div>
                 <div className="p-sub">{p.sub}</div>
-                <div className="p-friends">{p.friends} friends saved this</div>
+                <div className="p-friends">{p.friends + (savedIds.has(p.id) ? 1 : 0)} friends saved this</div>
               </div>
-              <button className="action-btn" style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 8 }}>+ Save</button>
+              <button
+                className={`action-btn${savedIds.has(p.id) ? ' saved' : ''}`}
+                style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 8 }}
+                onClick={e => toggleSave(e, p)}
+              >
+                {savedIds.has(p.id) ? '✓ Saved' : '+ Save'}
+              </button>
             </div>
           ))}
+          {places.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--text3)', padding: '20px 0', textAlign: 'center' }}>
+              No places match "{query}" — try a different search.
+            </div>
+          )}
         </div>
         <div className="explore-right">
           <div className="map-container">
-            <Map pins={pins} />
+            <Map pins={pins} center={focus ?? DEFAULT_CENTER} zoom={focus ? 15 : 13} />
             <div className="map-overlay-text">
               <strong>{pins.length} friend pins</strong> · San Francisco, CA
             </div>

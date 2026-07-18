@@ -29,12 +29,19 @@ export default function OnboardingPage() {
     return true;
   };
 
-  const handleNext = () => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleNext = async () => {
     if (step < STEPS.length - 1) {
       setStep(s => s + 1);
-    } else {
-      completeOnboarding(data);
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await completeOnboarding(data);
       navigate('/');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -66,9 +73,9 @@ export default function OnboardingPage() {
             className="btn-primary"
             style={{ flex: 2 }}
             onClick={handleNext}
-            disabled={!canAdvance()}
+            disabled={!canAdvance() || submitting}
           >
-            {step === STEPS.length - 1 ? 'Start exploring →' : 'Continue'}
+            {step === STEPS.length - 1 ? (submitting ? 'Setting up…' : 'Start exploring →') : 'Continue'}
           </button>
         </div>
       </div>

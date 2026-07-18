@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps } from '../lib/googleMaps';
 
 const DARK_STYLE = [
@@ -15,29 +15,45 @@ const DARK_STYLE = [
   { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#253040' }] },
 ];
 
-export default function Map({ pins, center = { lat: 37.787, lng: -122.43 }, zoom = 13 }) {
+export default function Map({ pins, center = { lat: 37.787, lng: -122.43 }, zoom = 13, fit = false }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const [ready, setReady] = useState(false); // map created — lets the marker effect re-run
 
   // Initialize map once
   useEffect(() => {
+    let cancelled = false;
     loadGoogleMaps().then((maps) => {
-      if (mapRef.current) return;
+      if (cancelled || mapRef.current || !containerRef.current) return;
+      // Follow the app theme at mount (theme changes apply on next page visit).
+      const isLight = document.documentElement.dataset.theme === 'light';
       mapRef.current = new maps.Map(containerRef.current, {
         center,
         zoom,
-        styles: DARK_STYLE,
+        // colorScheme is the modern themed base map; the styles array covers
+        // older raster keys where colorScheme is unavailable.
+        colorScheme: (isLight ? maps.ColorScheme?.LIGHT : maps.ColorScheme?.DARK) ?? undefined,
+        styles: isLight ? undefined : DARK_STYLE,
         disableDefaultUI: true,
         zoomControl: true,
         zoomControlOptions: { position: maps.ControlPosition.RIGHT_BOTTOM },
       });
-    });
+      setReady(true);
+    }).catch(() => {}); // no API key — the container just stays empty
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update markers when pins change
+  // Pan smoothly when the requested center changes (e.g. clicking a place card)
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps) return;
+    if (!mapRef.current || !center) return;
+    mapRef.current.panTo(center);
+    if (zoom) mapRef.current.setZoom(zoom);
+  }, [center?.lat, center?.lng, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update markers when pins change or the map becomes ready
+  useEffect(() => {
+    if (!ready || !mapRef.current || !window.google?.maps) return;
 
     // Remove old markers
     markersRef.current.forEach(m => m.setMap(null));
@@ -67,7 +83,14 @@ export default function Map({ pins, center = { lat: 37.787, lng: -122.43 }, zoom
       marker.addListener('click', () => infoWindow.open(mapRef.current, marker));
       markersRef.current.push(marker);
     });
-  }, [pins]);
+
+    // Frame every pin (used by the trip map, where stops can span cities)
+    if (fit && pins.length > 1) {
+      const bounds = new window.google.maps.LatLngBounds();
+      pins.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+      mapRef.current.fitBounds(bounds, 60);
+    }
+  }, [pins, ready, fit]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }
