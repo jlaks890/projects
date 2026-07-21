@@ -48,6 +48,9 @@ create table trips (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references users(id) on update cascade on delete cascade,
   title        text not null,
+  status       text default 'past',  -- stored intent for dateless trips: past|planned
+                                     -- (display status derives from dates — see src/lib/tripStatus.js)
+  destination  text,                 -- dream plans: "Lisbon" / "Japan" — powers want-to-go suggestions
   start_date   date,
   end_date     date,
   cover_emoji  text default '✈',
@@ -77,6 +80,7 @@ create table likes (
 create table saves (
   user_id    uuid not null references users(id) on update cascade on delete cascade,
   place_id   uuid not null references places(id) on delete cascade,
+  list       text default 'want_to_go',  -- been | want_to_go
   created_at timestamptz default now(),
   primary key (user_id, place_id)
 );
@@ -128,6 +132,7 @@ create policy "insert own" on likes   for insert with check (auth.uid() = user_i
 create policy "delete own" on likes   for delete using (auth.uid() = user_id);
 
 create policy "insert own" on saves   for insert with check (auth.uid() = user_id);
+create policy "update own" on saves   for update using (auth.uid() = user_id);
 create policy "delete own" on saves   for delete using (auth.uid() = user_id);
 
 -- ─── Storage: place photos & videos ──────────────────────────────────────────

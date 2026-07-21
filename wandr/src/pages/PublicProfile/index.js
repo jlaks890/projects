@@ -7,7 +7,17 @@ import { fetchUserByUsername } from '../../services/users';
 import { fetchTrips } from '../../services/trips';
 import { fetchUserPlaces } from '../../services/posts';
 import { fetchFollowerCount, fetchFollowing, followUser, unfollowUser } from '../../services/follows';
+import { saveExternalPlace, isExternalSaved } from '../../services/saves';
 import { stopsToPlaces, aggregateCountries, aggregateCities } from '../../lib/collections';
+import PlaceDetailModal from '../../components/PlaceDetailModal';
+import { tripStatus } from '../../lib/tripStatus';
+
+// Friend's stop or shared place → normalized place for the detail card
+const toDetailPlace = (p) => ({
+  name: p.name, city: p.city ?? '', country: p.country ?? '', countryFlag: p.countryFlag ?? '',
+  category: p.category, emoji: p.emoji, bg: p.bg ?? null, rating: p.rating ?? null, tip: p.tip ?? '',
+  lat: p.lat ?? null, lng: p.lng ?? null, media: p.media ?? [], visited: p.visited ?? '',
+});
 
 const TABS = [
   { id: 'trips',     label: 'Trips',     searchHint: '🔍 Search trips by title...' },
@@ -37,6 +47,7 @@ export default function PublicProfilePage() {
   const [followsYou, setFollowsYou] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('trips');
+  const [detailPlace, setDetailPlace] = useState(null); // normalized place in the detail card
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [expandedTripId, setExpandedTripId] = useState(null);
@@ -112,9 +123,12 @@ export default function PublicProfilePage() {
     (privacy === 'private' && isFollowing && followsYou);
 
   // ── Derived collections (same logic as own profile) ────────────────────────
+  // Their dream-plan stops don't count toward visited countries/cities.
+  const visitedTrips = trips.filter(t => tripStatus(t) !== 'planned');
   const allPlaces = [...stopsToPlaces(trips), ...places];
-  const countries = aggregateCountries(allPlaces);
-  const cities = aggregateCities(allPlaces);
+  const visitedPlaces = [...stopsToPlaces(visitedTrips), ...places];
+  const countries = aggregateCountries(visitedPlaces);
+  const cities = aggregateCities(visitedPlaces);
 
   const stats = [
     { id: 'countries', label: 'Countries', value: countries.length, tab: 'countries' },
@@ -159,7 +173,7 @@ export default function PublicProfilePage() {
                 <div className="day-block" key={day.day}>
                   <div className="day-header">Day {day.day} — {day.label}</div>
                   {day.stops.map((stop, i) => (
-                    <div className="stop-row" key={`${stop.name}-${i}`}>
+                    <div className="stop-row" key={`${stop.name}-${i}`} style={{ cursor: 'pointer' }} onClick={() => setDetailPlace(toDetailPlace(stop))}>
                       <div className="stop-icon" style={{ background: CAT_BG[stop.category] || '#111' }}>{stop.emoji}</div>
                       <div style={{ flex: 1 }}>
                         <div className="stop-name">{stop.name}</div>
@@ -176,6 +190,21 @@ export default function PublicProfilePage() {
                           </div>
                         )}
                       </div>
+                      <button
+                        className="list-tag want"
+                        title="Save to your Want-to-go list"
+                        disabled={isExternalSaved(stop)}
+                        style={isExternalSaved(stop) ? { opacity: 0.5, cursor: 'default' } : undefined}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const added = saveExternalPlace(stop);
+                          showToast(added
+                            ? `💭 ${stop.name} saved to Want to go — it'll suggest itself on your next plan`
+                            : `${stop.name} is already on your Want-to-go list`);
+                        }}
+                      >
+                        {isExternalSaved(stop) ? '✓ Wishlisted' : '💭 Want to go'}
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -192,7 +221,7 @@ export default function PublicProfilePage() {
 
     places: filteredPlaces.length ? (
       filteredPlaces.map(p => (
-        <div className="place-card" key={p.key} style={{ marginBottom: 10, cursor: 'default' }}>
+        <div className="place-card" key={p.key} style={{ marginBottom: 10 }} onClick={() => setDetailPlace(toDetailPlace(p))}>
           <div className="p-thumb" style={{ background: p.bg ?? CAT_BG[p.category] ?? 'var(--bg3)' }}>{p.emoji}</div>
           <div style={{ flex: 1 }}>
             <div className="p-name">{p.name}</div>
@@ -349,6 +378,21 @@ export default function PublicProfilePage() {
           )}
         </div>
       </div>
+
+      {detailPlace && (
+        <PlaceDetailModal
+          place={detailPlace}
+          onClose={() => setDetailPlace(null)}
+          saveState={isExternalSaved(detailPlace) ? 'saved' : 'unsaved'}
+          onSaveWishlist={() => {
+            const added = saveExternalPlace(detailPlace);
+            setDetailPlace({ ...detailPlace }); // re-render so the button flips to saved
+            showToast(added
+              ? `💭 ${detailPlace.name} saved to Want to go`
+              : `${detailPlace.name} is already on your Want-to-go list`);
+          }}
+        />
+      )}
     </div>
   );
 }

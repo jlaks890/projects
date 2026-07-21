@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Avatar from '../../components/Avatar';
 import Stars from '../../components/Stars';
 import AddPlaceModal from '../../components/AddPlaceModal';
+import PlaceDetailModal from '../../components/PlaceDetailModal';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { CATEGORIES } from '../../data';
@@ -18,6 +19,7 @@ export default function FeedPage() {
   const [feedTab, setFeedTab] = useState('friends'); // 'friends' | 'everyone'
   const [showAddModal, setShowAddModal] = useState(false);
   const [openComments, setOpenComments] = useState(null); // post id with composer open
+  const [detailPost, setDetailPost] = useState(null);      // post shown in the place detail card
   const [comments, setComments] = useState({});           // post id → [{author, text}] (local until comments table exists)
   const [draft, setDraft] = useState('');
   const { showToast } = useToast();
@@ -52,7 +54,7 @@ export default function FeedPage() {
     const saved = !post.saved;
     setPosts(ps => ps.map(p => p.id === id ? { ...p, saved } : p));
     setSaved(user.id, id, saved).catch(() => {});
-    showToast(saved ? '✓ Saved — find it under Profile → Places' : 'Removed from saved');
+    showToast(saved ? '💭 Saved to Want to go — find it under Profile → Places' : 'Removed from saved');
   };
 
   const handleShare = async (post) => {
@@ -64,6 +66,23 @@ export default function FeedPage() {
     if (result === 'copied') showToast('✓ Copied to clipboard');
     else if (result === 'shared') showToast('✓ Shared!');
   };
+
+  // Feed post → normalized place for the shared detail card
+  const postToPlace = (post) => ({
+    name: post.place,
+    city: (post.city ?? '').split(',')[0].trim(),
+    country: post.country ?? '',
+    countryFlag: post.countryFlag ?? '',
+    category: post.category,
+    emoji: post.emoji,
+    bg: post.bg,
+    rating: post.rating,
+    tip: post.tip,
+    lat: post.lat ?? null,
+    lng: post.lng ?? null,
+    media: post.media ?? [],
+    visited: post.visited ?? '',
+  });
 
   const handleComment = (postId) => {
     setDraft('');
@@ -152,7 +171,7 @@ export default function FeedPage() {
             const postUser = users.find(u => u.id === post.user_id);
             return (
               <div className="post-card" key={post.id}>
-                <div className="post-hero" style={{ background: post.bg }}>
+                <div className="post-hero" style={{ background: post.bg, cursor: 'pointer' }} onClick={() => setDetailPost(post)}>
                   {post.media?.length ? (
                     post.media[0].type === 'video'
                       ? <video src={post.media[0].url} muted playsInline autoPlay loop style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -168,7 +187,7 @@ export default function FeedPage() {
                     <span className="post-user">{postUser?.name ?? 'You'}</span>
                     <span className="post-time">{post.timeAgo}</span>
                   </div>
-                  <div className="post-place">{post.place}</div>
+                  <div className="post-place" style={{ cursor: 'pointer' }} title="View place details" onClick={() => setDetailPost(post)}>{post.place}</div>
                   <div className="post-city">
                     📍 {post.city}
                     {post.visited && <span style={{ color: 'var(--text3)' }}> · visited {new Date(`${post.visited}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
@@ -271,6 +290,16 @@ export default function FeedPage() {
       </div>
 
       {showAddModal && <AddPlaceModal onClose={() => setShowAddModal(false)} onAdd={handleAddPlace} />}
+      {detailPost && (
+        <PlaceDetailModal
+          place={postToPlace(detailPost)}
+          onClose={() => setDetailPost(null)}
+          saveState={detailPost.user_id === user?.id ? 'hidden' : (posts.find(p => p.id === detailPost.id)?.saved ? 'saved' : 'unsaved')}
+          onSaveWishlist={() => {
+            if (!posts.find(p => p.id === detailPost.id)?.saved) handleSave(detailPost.id);
+          }}
+        />
+      )}
     </div>
   );
 }

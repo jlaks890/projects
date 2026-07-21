@@ -287,6 +287,17 @@ export const TRIPS = [
     ],
   },
   {
+    id: 6,
+    user_id: '1',
+    title: 'Portugal someday 🌊',
+    status: 'planned',
+    destination: 'Lisbon',
+    coverEmoji: '🏖',
+    coverBg: '#1a1400',
+    days: 0, stops: 0, sharedWith: 0,
+    itinerary: [],
+  },
+  {
     id: 3,
     user_id: '2',
     title: 'Kyoto · Apr 2024',
