@@ -7,6 +7,8 @@ function mapTrip(row) {
     id: row.id,
     user_id: row.user_id,
     title: row.title,
+    status: row.status ?? 'past',
+    destination: row.destination ?? '',
     startDate: row.start_date,
     endDate: row.end_date,
     coverEmoji: row.cover_emoji,
@@ -30,10 +32,10 @@ export async function fetchTrips(userId) {
   return data.map(mapTrip);
 }
 
-export async function createTrip(userId, { title, coverEmoji, coverBg, startDate, endDate }) {
+export async function createTrip(userId, { title, coverEmoji, coverBg, startDate, endDate, status = 'past', destination = '' }) {
   if (!supabase) {
     const trip = {
-      id: Date.now(), user_id: userId, title,
+      id: Date.now(), user_id: userId, title, status, destination,
       startDate: startDate || null, endDate: endDate || null,
       coverEmoji, coverBg, days: 0, stops: 0, sharedWith: 0, itinerary: [],
     };
@@ -43,13 +45,28 @@ export async function createTrip(userId, { title, coverEmoji, coverBg, startDate
   const { data, error } = await supabase
     .from('trips')
     .insert({
-      user_id: userId, title, cover_emoji: coverEmoji, cover_bg: coverBg,
+      user_id: userId, title, status, destination: destination || null,
+      cover_emoji: coverEmoji, cover_bg: coverBg,
       start_date: startDate || null, end_date: endDate || null,
     })
     .select()
     .single();
   if (error) throw error;
   return mapTrip(data);
+}
+
+// Dream plans "firm up" by getting dates — status display derives from them.
+export async function updateTripDates(tripId, { startDate, endDate }) {
+  if (!supabase) {
+    const t = TRIPS.find(t => t.id === tripId);
+    if (t) Object.assign(t, { startDate: startDate || null, endDate: endDate || null });
+    return;
+  }
+  const { error } = await supabase
+    .from('trips')
+    .update({ start_date: startDate || null, end_date: endDate || null })
+    .eq('id', tripId);
+  if (error) throw error;
 }
 
 // Replaces the trip's itinerary jsonb (used for add/edit/remove stop).

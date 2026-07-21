@@ -5,8 +5,9 @@ import { useToast } from '../../context/ToastContext';
 import { USERS, BADGES, CATEGORIES } from '../../data';
 import { fetchTrips } from '../../services/trips';
 import { fetchFollowing } from '../../services/follows';
-import { fetchSavedPlaces, removeSavedPlace } from '../../services/saves';
+import { fetchSavedPlaces, removeSavedPlace, setSavedList } from '../../services/saves';
 import { stopsToPlaces, aggregateCountries, aggregateCities } from '../../lib/collections';
+import { tripStatus } from '../../lib/tripStatus';
 
 const TABS = [
   { id: 'trips',     label: 'Trips',     searchHint: '🔍 Search trips by title...' },
@@ -32,6 +33,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('trips');
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState('all');
+  const [listFilter, setListFilter] = useState('all'); // all | been | want_to_go
   const [trips, setTrips] = useState([]);
   const [following, setFollowing] = useState([]);
   const [savedPlaces, setSavedPlaces] = useState([]);
@@ -54,6 +56,16 @@ export default function ProfilePage() {
     setActiveTab(id);
     setQuery('');
     setCatFilter('all');
+    setListFilter('all');
+  };
+
+  // Flip a place between ✓ Been and 💭 Want to go
+  const handleFlipList = (e, p) => {
+    e.stopPropagation();
+    const next = p.list === 'been' ? 'want_to_go' : 'been';
+    setSavedPlaces(list => list.map(x => x.key === p.key ? { ...x, list: next } : x));
+    setSavedList(user.id, p, next).catch(() => {});
+    showToast(next === 'been' ? `✓ Marked ${p.name} as been` : `💭 ${p.name} moved to Want to go`);
   };
 
   const handleRemoveSave = (e, p) => {
@@ -73,9 +85,16 @@ export default function ProfilePage() {
     : seedUser?.travelStyle ?? [];
 
   // ── Derived collections (shared logic with public profiles) ────────────────
-  const allPlaces = [...stopsToPlaces(trips), ...savedPlaces];
-  const countries = aggregateCountries(allPlaces);
-  const cities = aggregateCities(allPlaces);
+  // Stops in past/live trips count as "been"; stops in dream plans are still
+  // wishes. Countries/Cities/badges reflect places actually visited — the
+  // wishlist never inflates travel stats.
+  const tripPlaces = trips.flatMap(t =>
+    stopsToPlaces([t]).map(p => ({ ...p, list: tripStatus(t) === 'planned' ? 'want_to_go' : 'been' }))
+  );
+  const allPlaces = [...tripPlaces, ...savedPlaces];
+  const beenPlaces = allPlaces.filter(p => p.list !== 'want_to_go');
+  const countries = aggregateCountries(beenPlaces);
+  const cities = aggregateCities(beenPlaces);
 
   const stats = [
     { id: 'countries', label: 'Countries', value: countries.length, tab: 'countries' },
@@ -88,11 +107,11 @@ export default function ProfilePage() {
   const ASIAN_COUNTRIES = ['Japan', 'China', 'Indonesia', 'Thailand', 'Vietnam', 'South Korea', 'Taiwan', 'India', 'Malaysia', 'Philippines'];
   const ISLAND_COUNTRIES = ['Indonesia', 'Philippines', 'Maldives', 'Fiji', 'Iceland', 'Sri Lanka'];
   const badgeProgress = {
-    'Foodie 50':     { current: allPlaces.filter(p => p.category === 'food').length, goal: 50 },
+    'Foodie 50':     { current: beenPlaces.filter(p => p.category === 'food').length, goal: 50 },
     'Jet Setter':    { current: countries.length, goal: 10 },
     'Asia Explorer': { current: countries.filter(c => ASIAN_COUNTRIES.includes(c.name)).length, goal: 5 },
     'Storyteller':   { current: trips.length, goal: 10 },
-    'Summit Seeker': { current: allPlaces.filter(p => p.category === 'nature').length, goal: 10 },
+    'Summit Seeker': { current: beenPlaces.filter(p => p.category === 'nature').length, goal: 10 },
     'Island Hopper': { current: countries.filter(c => ISLAND_COUNTRIES.includes(c.name)).length, goal: 5 },
   };
 
@@ -102,6 +121,7 @@ export default function ProfilePage() {
 
   const filteredTrips = trips.filter(t => match(t.title));
   const filteredPlaces = allPlaces
+    .filter(p => listFilter === 'all' || (p.list ?? 'been') === listFilter)
     .filter(p => catFilter === 'all' || p.category === catFilter)
     .filter(p => match(p.name, p.city, p.country));
   const filteredCountries = countries.filter(c => match(c.name, c.cities));
@@ -135,16 +155,26 @@ export default function ProfilePage() {
               {p.rating ? <span style={{ color: 'var(--accent)' }}> · {'★'.repeat(p.rating)}</span> : null}
             </div>
           </div>
-          <span className="source-tag">{SOURCE_LABEL[p.source] ?? p.source}</span>
-          {p.source !== 'trip' && (
-            <button
-              className="action-btn"
-              title={p.source === 'added' ? 'Remove this place' : 'Remove from saved'}
-              style={{ padding: '4px 8px', fontSize: 14, color: 'var(--text3)' }}
-              onClick={e => handleRemoveSave(e, p)}
-            >
-              ✕
-            </button>
+          {p.source === 'trip' ? (
+            <span className="source-tag">{SOURCE_LABEL[p.source]}</span>
+          ) : (
+            <>
+              <button
+                className={`list-tag ${p.list === 'been' ? 'been' : 'want'}`}
+                title="Tap to switch list"
+                onClick={e => handleFlipList(e, p)}
+              >
+                {p.list === 'been' ? '✓ Been' : '💭 Want to go'}
+              </button>
+              <button
+                className="action-btn"
+                title={p.source === 'added' ? 'Remove this place' : 'Remove from saved'}
+                style={{ padding: '4px 8px', fontSize: 14, color: 'var(--text3)' }}
+                onClick={e => handleRemoveSave(e, p)}
+              >
+                ✕
+              </button>
+            </>
           )}
         </div>
       ))
@@ -254,14 +284,27 @@ export default function ProfilePage() {
           />
 
           {activeTab === 'places' && (
-            <div className="filter-row">
-              <button className={`filter-chip${catFilter === 'all' ? ' active' : ''}`} onClick={() => setCatFilter('all')}>All</button>
-              {CATEGORIES.map(c => (
-                <button key={c.id} className={`filter-chip${catFilter === c.id ? ' active' : ''}`} onClick={() => setCatFilter(c.id)}>
-                  {c.emoji} {c.label.split(' ')[0]}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="filter-row" style={{ marginBottom: 10 }}>
+                {[
+                  { id: 'all',        label: 'All' },
+                  { id: 'been',       label: '✓ Been' },
+                  { id: 'want_to_go', label: '💭 Want to go' },
+                ].map(l => (
+                  <button key={l.id} className={`filter-chip${listFilter === l.id ? ' active' : ''}`} onClick={() => setListFilter(l.id)}>
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+              <div className="filter-row">
+                <button className={`filter-chip${catFilter === 'all' ? ' active' : ''}`} onClick={() => setCatFilter('all')}>All</button>
+                {CATEGORIES.map(c => (
+                  <button key={c.id} className={`filter-chip${catFilter === c.id ? ' active' : ''}`} onClick={() => setCatFilter(c.id)}>
+                    {c.emoji} {c.label.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
 
           <div key={activeTab} style={{ animation: 'fadeUp 0.25s ease' }}>

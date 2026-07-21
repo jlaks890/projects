@@ -12,7 +12,9 @@ npm test        # Run Jest tests
 
 ## Product vision
 
-Wandr is a web + mobile app for tracking the places you visit during a trip — automatic place detection via GPS/Google Maps on mobile, manual entry everywhere — with finished trips shareable as itineraries to friends. See `docs/vision.md` for the full vision, data-model implications, and roadmap (Supabase backend → Places-powered manual entry → shareable trip pages → mobile auto-detection).
+Wandr is a web + mobile app for tracking the places you visit during a trip — automatic place detection via GPS/Google Maps on mobile, manual entry everywhere — with finished trips shareable as itineraries to friends. **`docs/wandr-overview.md` is the single-file product + technical overview (vision, feature inventory, architecture, data model, roadmap) — keep it updated when features land.** `docs/vision.md` has the original vision notes.
+
+Current product state: the full frontend loop works on both data modes — trips with dates/named days/media/date-visited, Google Places (New) autocomplete with manual fallback and city/country extraction, Friends/Everyone feed tabs, unified saves surfacing in Profile → Places, tabbed searchable profiles (own + public), follow-gated privacy levels (public/semi/private), dark + bright themes, and a Settings page. **Planning features (roadmap step 3)**: saves split into Been / Want-to-go lists (defaults: self-logged → been, saved-from-others → want-to-go; flippable; wishlist excluded from Countries/Cities stats); trips have derived past/live/planned status (`src/lib/tripStatus.js` — dates are truth, never a manual picker), grouped Traveling now / Dream plans / Past trips; dream plans carry a destination and surface matching want-to-go suggestions for one-tap itinerary adds; friends' itinerary stops have a Want-to-go save button.
 
 ## Architecture
 
@@ -22,7 +24,11 @@ Wandr is a social travel app built with Create React App + React Router v7. **Da
 
 ```
 src/
-├── components/          # Shared UI: Avatar, Stars, Toast, AddPlaceModal
+├── components/          # Shared UI: Avatar, Stars, Toast, AddPlaceModal,
+│                        # PlaceDetailModal (shared place card: community info via
+│                        # services/community.js, want-to-go save, add-to-trip picker;
+│                        # opened from Explore, feed posts, own trip stops, friends'
+│                        # trip stops/places)
 ├── context/
 │   ├── AuthContext.js   # user + profile state; signIn*, signOut, completeOnboarding, updateProfile
 │   ├── ThemeContext.js  # dark/bright theme; sets data-theme on <html>, persists to localStorage
@@ -33,25 +39,37 @@ src/
 ├── lib/
 │   ├── googleMaps.js    # modern importLibrary loader (needs REACT_APP_GOOGLE_MAPS_API_KEY);
 │   │                    # exposes loadGoogleMaps() and loadPlacesLibrary() (Places API New)
+│   ├── places.js        # city/country extraction: Places addressComponents parsing,
+│   │                    # manual "City, Country" parsing, country-flag helpers
+│   ├── collections.js   # shared rollups: trip stops → places → Countries/Cities lists
 │   ├── share.js         # navigator.share with clipboard fallback
 │   └── supabase.js      # Supabase client (null when env vars absent → static fallback)
 ├── pages/
 │   ├── Feed/            # Friends/Everyone tabs, likes, saves, comments, add place
 │   ├── Explore/         # searchable place list + Google Map; saves feed into Profile
-│   ├── Trips/           # trip itinerary builder (create, add stops, share, map view)
+│   ├── Trips/           # create (title + start/end dates + cover), named/editable day
+│   │                    # descriptions, add/reorder/remove stops, media thumbs,
+│   │                    # share links, map view (fit bounds), print-to-PDF
 │   ├── Profile/         # left: stats + condensed badges/style; right: Trips/Places/
-│   │                    # Countries/Cities tabs with search + category filters
-│   ├── People/          # search travelers + following list
-│   ├── Settings/        # account fields, theme picker, notification/privacy toggles
-│   ├── PublicProfile/   # /user/:username — other users' trips & style
+│   │                    # Countries/Cities tabs with search + category filters;
+│   │                    # saves removable from Places tab
+│   ├── People/          # search travelers, follow/unfollow, discover list
+│   ├── Settings/        # account fields, dark/bright theme, privacy level picker
+│   │                    # (public/semi/private), notification toggles, sign out
+│   ├── PublicProfile/   # /user/:username — same tabbed layout as own profile;
+│   │                    # content gated by privacy: semi needs follow, private
+│   │                    # needs mutual follow (stats always visible)
 │   ├── Login/           # Google OAuth + email sign-in
 │   └── Onboarding/      # 3-step wizard: username → travel style → follow friends
 ├── services/            # async data layer: Supabase queries with data.js fallback
-│                        # (auth, users, follows, posts, trips, saves)
+│                        # (auth, users, follows, posts, trips, saves, media)
 │                        # saves.js unifies feed/explore saves + own posts for
-│                        # Profile → Places (explore saves are session-local)
-├── data.js              # Static seed data — fallback + config (CATEGORIES, BADGES)
-└── styles.css           # Complete design system (~500 lines, dark theme)
+│                        # Profile → Places (explore saves are session-local);
+│                        # media.js uploads to the Supabase `media` storage bucket
+│                        # (object URLs in fallback)
+├── data.js              # Static seed data — fallback + config; CATEGORIES has 9
+│                        # entries incl. Lodging, Logistics, Landmarks (CAT_BG too)
+└── styles.css           # Complete design system, dark + bright themes
 ```
 
 ### Routing
@@ -85,8 +103,8 @@ Page layouts use fixed-width left panels alongside a main/map area, collapsing b
 
 ### Backend (wired, awaiting a Supabase project)
 
-All code is in place — client, schema, seed data, services, auth. To activate:
+All code is in place — client, schema (incl. `users.privacy`, `places` city/country/visited_on/media columns, trip dates, and the public `media` storage bucket), seed data, services, auth. To activate:
 1. Create a Supabase project; run `supabase/schema.sql` then `supabase/seed.sql` in its SQL Editor
 2. Set `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_ANON_KEY` in `.env.local` and restart the dev server
 
-Details (including how to log in as the seeded user): `docs/backend-setup.md`.
+Details (including how to log in as the seeded user): `docs/backend-setup.md`. Google key needs **Maps JavaScript API** + **Places API (New)** enabled.

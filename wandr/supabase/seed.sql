@@ -55,6 +55,10 @@ insert into likes (user_id, place_id) values
 insert into saves (user_id, place_id) values
 ('00000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003');
 
+-- A seeded dream plan (dateless → shows under "Dream plans")
+insert into trips (id, user_id, title, status, destination, cover_emoji, cover_bg, days, stops, shared_with, itinerary) values
+('20000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'Portugal someday 🌊', 'planned', 'Lisbon', '🏖', '#1a1400', 0, 0, 0, '[]');
+
 insert into trips (id, user_id, title, cover_emoji, cover_bg, days, stops, shared_with, itinerary) values
 ('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Tokyo · May 2024', '🗾', '#0a1520', 5, 14, 3,
  '[{"day":1,"label":"Arrive & Eat","stops":[

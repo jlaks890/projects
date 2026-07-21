@@ -5,9 +5,19 @@ import { useAuth } from '../../context/AuthContext';
 import { CATEGORIES, CAT_BG } from '../../data';
 import { shareContent, copyText } from '../../lib/share';
 import { parseCityCountry } from '../../lib/places';
-import { fetchTrips, createTrip, updateItinerary } from '../../services/trips';
+import { tripStatus, STATUS_META, groupTripsByStatus } from '../../lib/tripStatus';
+import { fetchTrips, createTrip, updateItinerary, updateTripDates } from '../../services/trips';
+import { fetchWantToGo } from '../../services/saves';
 import AddPlaceModal from '../../components/AddPlaceModal';
+import PlaceDetailModal from '../../components/PlaceDetailModal';
 import Map from '../../components/Map';
+
+// Trip stop → normalized place for the shared detail card
+const stopToPlace = (stop) => ({
+  name: stop.name, city: stop.city ?? '', country: stop.country ?? '', countryFlag: stop.countryFlag ?? '',
+  category: stop.category, emoji: stop.emoji, bg: null, rating: stop.rating, tip: stop.tip,
+  lat: stop.lat ?? null, lng: stop.lng ?? null, media: stop.media ?? [], visited: stop.visited ?? '',
+});
 
 const COVER_OPTIONS = [
   { emoji: '✈', bg: '#0a1520' },
@@ -44,7 +54,28 @@ export default function TripsPage() {
   const [editingDay, setEditingDay] = useState(null); // { day, value } — renaming a day description
   const [openMenu, setOpenMenu] = useState(null);     // `${day}-${index}` of the open ⋯ menu
   const [view, setView] = useState('list');           // 'list' | 'map'
+  const [wantToGo, setWantToGo] = useState([]);       // wishlist suggestions for dream plans
+  const [detailStop, setDetailStop] = useState(null); // stop shown in the place detail card
+  const [editingDates, setEditingDates] = useState(null); // { startDate, endDate } while firming up a plan
   const { showToast } = useToast();
+
+  const status = activeTrip ? tripStatus(activeTrip) : null;
+
+  // Dream plans pull suggestions from the want-to-go list, narrowed to the
+  // trip's destination (or title as a fallback hint).
+  useEffect(() => {
+    if (!user || !activeTrip || tripStatus(activeTrip) !== 'planned') { setWantToGo([]); return; }
+    let cancelled = false;
+    const destination = activeTrip.destination || activeTrip.title.split('·')[0].trim();
+    fetchWantToGo(user.id, destination)
+      .then(async (matches) => {
+        // Fall back to the whole wishlist when nothing matches the destination
+        const list = matches.length ? matches : await fetchWantToGo(user.id, '');
+        if (!cancelled) setWantToGo(list);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.id, activeTrip?.id, activeTrip?.stops]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;
@@ -61,16 +92,50 @@ export default function TripsPage() {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Trip creation ──────────────────────────────────────────────────────────
-  const handleCreateTrip = async ({ title, coverEmoji, coverBg }) => {
+  const handleCreateTrip = async (draft) => {
     try {
-      const trip = await createTrip(user.id, { title, coverEmoji, coverBg });
+      const trip = await createTrip(user.id, draft);
       setMyTrips(ts => [trip, ...ts]);
       setActiveTrip(trip);
       setShowNewTrip(false);
-      showToast(`✓ Trip "${title}" created — add your first stop!`);
+      showToast(draft.status === 'planned'
+        ? `💭 Dream plan "${draft.title}" started — add places from your wishlist!`
+        : `✓ Trip "${draft.title}" created — add your first stop!`);
     } catch {
       showToast('Could not create trip — try again');
     }
+  };
+
+  // Firm up a dream plan (or fix a log): set/change dates in place
+  const handleSaveDates = async () => {
+    const { startDate, endDate } = editingDates;
+    if (startDate && endDate && endDate < startDate) { showToast('End date is before the start date'); return; }
+    const updated = { ...activeTrip, startDate: startDate || null, endDate: endDate || null };
+    setActiveTrip(updated);
+    setMyTrips(ts => ts.map(t => t.id === updated.id ? updated : t));
+    setEditingDates(null);
+    updateTripDates(updated.id, { startDate, endDate }).catch(() => showToast('Could not save dates'));
+    const newStatus = tripStatus(updated);
+    if (newStatus === 'live') showToast('🧭 Dates set — this trip is happening now!');
+    else if (newStatus === 'planned') showToast('📅 Dates locked in — see you there');
+    else showToast('✓ Dates saved');
+  };
+
+  // Add a wishlist place straight into the itinerary (dream-plan flow)
+  const handleAddSuggestion = (p) => {
+    const lastDay = activeTrip.itinerary.at(-1);
+    const dayNum = lastDay?.day ?? 1;
+    const stop = {
+      name: p.name, category: p.category, emoji: p.emoji, time: 'Anytime',
+      tip: p.tip || '', rating: p.rating ?? 0, lat: p.lat ?? null, lng: p.lng ?? null,
+      city: p.city ?? '', country: p.country ?? '', countryFlag: p.countryFlag ?? '',
+      visited: '', media: p.media ?? [],
+    };
+    const itinerary = lastDay
+      ? activeTrip.itinerary.map(d => d.day === dayNum ? { ...d, stops: [...d.stops, stop] } : d)
+      : [{ day: 1, label: 'Ideas', stops: [stop] }];
+    applyItinerary(itinerary);
+    showToast(`✓ ${p.name} added to day ${dayNum}`);
   };
 
   // ── Itinerary mutations (optimistic; write through the service) ────────────
@@ -173,32 +238,46 @@ export default function TripsPage() {
       <div className="trips-layout">
         <div className="trips-left">
           <div className="section-heading">My trips</div>
-          <div className="section-sub">Your travel itineraries</div>
-          {myTrips.map(trip => (
-            <div
-              key={trip.id}
-              className={`trip-card${activeTrip?.id === trip.id ? ' active' : ''}`}
-              onClick={() => { setActiveTrip(trip); setView('list'); setAddingDay(false); setOpenMenu(null); }}
-            >
-              <div className="trip-cover" style={{ background: trip.coverBg }}>
-                <span style={{ fontSize: 52 }}>{trip.coverEmoji}</span>
+          <div className="section-sub">Past, present, and dreamed-up</div>
+          {groupTripsByStatus(myTrips).map(group => (
+            <div key={group.status}>
+              <div className="trip-group-heading">
+                <span style={{ color: group.meta.color }}>{group.meta.emoji} {group.meta.section}</span>
               </div>
-              <div className="trip-info">
-                <div className="trip-title">{trip.title}</div>
-                <div className="trip-meta">
-                  <span>{plural(trip.days, 'day')}</span>
-                  <span>·</span>
-                  <span>{plural(trip.stops, 'stop')}</span>
-                  <span>·</span>
-                  <span style={{ color: 'var(--accent2)' }}>Shared with {trip.sharedWith}</span>
+              {group.trips.map(trip => (
+                <div
+                  key={trip.id}
+                  className={`trip-card${activeTrip?.id === trip.id ? ' active' : ''}`}
+                  onClick={() => { setActiveTrip(trip); setView('list'); setAddingDay(false); setOpenMenu(null); setEditingDates(null); }}
+                >
+                  <div className="trip-cover" style={{ background: trip.coverBg, height: 96 }}>
+                    <span style={{ fontSize: 44 }}>{trip.coverEmoji}</span>
+                    {group.status !== 'past' && (
+                      <span className="status-chip" style={{ color: group.meta.color }}>
+                        {group.meta.emoji} {group.status === 'live' ? 'Now' : 'Plan'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="trip-info">
+                    <div className="trip-title">{trip.title}</div>
+                    <div className="trip-meta">
+                      <span>{plural(trip.days, 'day')}</span>
+                      <span>·</span>
+                      <span>{plural(trip.stops, 'stop')}</span>
+                      <span>·</span>
+                      <span style={{ color: 'var(--accent2)' }}>Shared with {trip.sharedWith}</span>
+                    </div>
+                    <div className="trip-meta" style={{ marginTop: 4 }}>
+                      {dateRange(trip.startDate, trip.endDate)
+                        ? <>📅 {dateRange(trip.startDate, trip.endDate)}</>
+                        : group.status === 'planned' && <span style={{ color: 'var(--text3)' }}>No dates yet — still dreaming</span>}
+                    </div>
+                  </div>
                 </div>
-                {dateRange(trip.startDate, trip.endDate) && (
-                  <div className="trip-meta" style={{ marginTop: 4 }}>📅 {dateRange(trip.startDate, trip.endDate)}</div>
-                )}
-              </div>
+              ))}
             </div>
           ))}
-          <button className="btn-primary" style={{ width: '100%', padding: '12px', marginTop: 4 }} onClick={() => setShowNewTrip(true)}>
+          <button className="btn-primary" style={{ width: '100%', padding: '12px', marginTop: 12 }} onClick={() => setShowNewTrip(true)}>
             + New trip
           </button>
         </div>
@@ -213,21 +292,54 @@ export default function TripsPage() {
           )}
           {activeTrip && (
             <>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-                <div>
-                  <div className="section-heading">{activeTrip.title}</div>
-                  <div style={{ display: 'flex', gap: 10, fontSize: 13, color: 'var(--text2)', flexWrap: 'wrap' }}>
-                    <span>{plural(activeTrip.itinerary.length || activeTrip.days, 'day')}</span>
-                    <span>·</span>
-                    <span>{plural(countStops(activeTrip.itinerary) || activeTrip.stops, 'stop')}</span>
-                    {dateRange(activeTrip.startDate, activeTrip.endDate) && (
-                      <>
-                        <span>·</span>
-                        <span style={{ color: 'var(--accent2)' }}>📅 {dateRange(activeTrip.startDate, activeTrip.endDate)}</span>
-                      </>
-                    )}
-                  </div>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div className="section-heading" style={{ marginBottom: 0 }}>{activeTrip.title}</div>
+                  <span className="status-chip inline" style={{ color: STATUS_META[status].color }}>
+                    {STATUS_META[status].emoji} {STATUS_META[status].label}
+                  </span>
                 </div>
+                <div style={{ display: 'flex', gap: 10, fontSize: 13, color: 'var(--text2)', flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+                  <span>{plural(activeTrip.itinerary.length || activeTrip.days, 'day')}</span>
+                  <span>·</span>
+                  <span>{plural(countStops(activeTrip.itinerary) || activeTrip.stops, 'stop')}</span>
+                  {activeTrip.destination && (
+                    <>
+                      <span>·</span>
+                      <span>📍 {activeTrip.destination}</span>
+                    </>
+                  )}
+                  <span>·</span>
+                  {dateRange(activeTrip.startDate, activeTrip.endDate) ? (
+                    <span style={{ color: 'var(--accent2)' }}>📅 {dateRange(activeTrip.startDate, activeTrip.endDate)}</span>
+                  ) : null}
+                  <button
+                    className="action-btn"
+                    style={{ padding: '2px 10px', border: '1px dashed var(--border2)', borderRadius: 12, fontSize: 12 }}
+                    onClick={() => setEditingDates(ed => ed ? null : { startDate: activeTrip.startDate ?? '', endDate: activeTrip.endDate ?? '' })}
+                  >
+                    {activeTrip.startDate || activeTrip.endDate ? '✎ Edit dates' : '📅 Set dates'}
+                  </button>
+                </div>
+                {editingDates && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', animation: 'fadeUp 0.2s ease' }}>
+                    <input
+                      className="input-field" type="date" style={{ width: 'auto', colorScheme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark' }}
+                      value={editingDates.startDate}
+                      max={editingDates.endDate || undefined}
+                      onChange={e => setEditingDates(ed => ({ ...ed, startDate: e.target.value }))}
+                    />
+                    <span style={{ color: 'var(--text3)' }}>→</span>
+                    <input
+                      className="input-field" type="date" style={{ width: 'auto', colorScheme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark' }}
+                      value={editingDates.endDate}
+                      min={editingDates.startDate || undefined}
+                      onChange={e => setEditingDates(ed => ({ ...ed, endDate: e.target.value }))}
+                    />
+                    <button className="btn-primary" style={{ flex: 'none', width: 'auto', padding: '8px 16px', fontSize: 13 }} onClick={handleSaveDates}>Save</button>
+                    <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: 13 }} onClick={() => setEditingDates(null)}>Cancel</button>
+                  </div>
+                )}
               </div>
 
               <div className="share-section">
@@ -263,6 +375,32 @@ export default function TripsPage() {
                   <button className="export-btn" onClick={() => window.print()}>📄 PDF</button>
                 </div>
               </div>
+
+              {view === 'list' && status === 'planned' && (() => {
+                const inItinerary = new Set(activeTrip.itinerary.flatMap(d => d.stops.map(s => s.name)));
+                const suggestions = wantToGo.filter(p => !inItinerary.has(p.name)).slice(0, 6);
+                if (!suggestions.length) return null;
+                return (
+                  <div className="suggest-panel">
+                    <div className="sidebar-heading" style={{ marginBottom: 4 }}>💭 From your Want-to-go list</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>
+                      Places you've saved that fit this trip — one tap to add them to the plan.
+                    </div>
+                    {suggestions.map(p => (
+                      <div className="suggest-row" key={p.key}>
+                        <div className="p-thumb" style={{ background: p.bg ?? 'var(--bg3)', width: 36, height: 36, fontSize: 16 }}>{p.emoji}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="p-name" style={{ fontSize: 13 }}>{p.name}</div>
+                          <div className="p-sub" style={{ fontSize: 11 }}>{[p.city, p.country].filter(Boolean).join(', ')}</div>
+                        </div>
+                        <button className="follow-btn" style={{ padding: '5px 12px', fontSize: 11 }} onClick={() => handleAddSuggestion(p)}>
+                          + Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {view === 'map' && (
                 <div style={{ height: 420, borderRadius: 'var(--r2)', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 20, animation: 'fadeUp 0.25s ease' }}>
@@ -301,7 +439,7 @@ export default function TripsPage() {
                     </div>
                   )}
                   {day.stops.map((stop, i) => (
-                    <div className="stop-row" key={`${stop.name}-${i}`}>
+                    <div className="stop-row" key={`${stop.name}-${i}`} style={{ cursor: 'pointer' }} onClick={() => setDetailStop(stop)}>
                       <div className="stop-icon" style={{ background: CAT_BG[stop.category] || '#111' }}>{stop.emoji}</div>
                       <div style={{ flex: 1 }}>
                         <div className="stop-name">{stop.name}</div>
@@ -323,7 +461,7 @@ export default function TripsPage() {
                           </div>
                         )}
                       </div>
-                      <div className="menu-wrap">
+                      <div className="menu-wrap" onClick={e => e.stopPropagation()}>
                         <button
                           style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, padding: '2px 6px' }}
                           onClick={() => setOpenMenu(m => m === `${day.day}-${i}` ? null : `${day.day}-${i}`)}
@@ -389,45 +527,83 @@ export default function TripsPage() {
 
       {showNewTrip && <NewTripModal onClose={() => setShowNewTrip(false)} onCreate={handleCreateTrip} />}
       {addStopDay != null && <AddPlaceModal onClose={() => setAddStopDay(null)} onAdd={handleAddStop} />}
+      {detailStop && (
+        <PlaceDetailModal
+          place={stopToPlace(detailStop)}
+          onClose={() => setDetailStop(null)}
+          saveState="hidden"
+        />
+      )}
     </div>
   );
 }
 
 function NewTripModal({ onClose, onCreate }) {
+  const [intent, setIntent] = useState('log'); // 'log' (past/current) | 'dream' (future)
   const [title, setTitle] = useState('');
+  const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [cover, setCover] = useState(COVER_OPTIONS[0]);
 
   const datesInvalid = Boolean(startDate && endDate && endDate < startDate);
   const canCreate = title.trim() && !datesInvalid;
+
+  // Live hint: where will this trip land? (status derives from dates)
+  const preview = tripStatus({ startDate: startDate || null, endDate: endDate || null, status: intent === 'dream' ? 'planned' : 'past' });
+
   const submit = () => canCreate && onCreate({
     title: title.trim(),
     coverEmoji: cover.emoji,
     coverBg: cover.bg,
     startDate: startDate || null,
     endDate: endDate || null,
+    status: intent === 'dream' ? 'planned' : 'past',
+    destination: destination.trim(),
   });
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-title">New trip</div>
-        <div className="modal-sub">Name it, set the dates, pick a cover — stops come next</div>
+        <div className="modal-sub">Log where you've been, or start dreaming up where you're going</div>
+
+        <div className="seg-tabs" style={{ display: 'flex', width: '100%', marginBottom: 16 }}>
+          <button className={`seg-tab${intent === 'log' ? ' active' : ''}`} style={{ flex: 1 }} onClick={() => setIntent('log')}>
+            ✈ Trip log
+          </button>
+          <button className={`seg-tab${intent === 'dream' ? ' active' : ''}`} style={{ flex: 1 }} onClick={() => setIntent('dream')}>
+            💭 Dream plan
+          </button>
+        </div>
+
         <div className="input-group">
           <div className="input-label">Trip title</div>
           <input
             className="input-field"
-            placeholder="e.g. Lisbon · Oct 2026"
+            placeholder={intent === 'dream' ? 'e.g. Japan someday 🌸' : 'e.g. Lisbon · Oct 2026'}
             value={title}
             autoFocus
             onChange={e => setTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
           />
         </div>
+
+        {intent === 'dream' && (
+          <div className="input-group">
+            <div className="input-label">Destination</div>
+            <input
+              className="input-field"
+              placeholder="e.g. Lisbon, or Japan — powers wishlist suggestions"
+              value={destination}
+              onChange={e => setDestination(e.target.value)}
+            />
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="input-group">
-            <div className="input-label">Start date</div>
+            <div className="input-label">Start date{intent === 'dream' ? ' (optional)' : ''}</div>
             <input
               className="input-field"
               type="date"
@@ -438,7 +614,7 @@ function NewTripModal({ onClose, onCreate }) {
             />
           </div>
           <div className="input-group">
-            <div className="input-label">End date</div>
+            <div className="input-label">End date{intent === 'dream' ? ' (optional)' : ''}</div>
             <input
               className="input-field"
               type="date"
@@ -449,11 +625,16 @@ function NewTripModal({ onClose, onCreate }) {
             />
           </div>
         </div>
-        {datesInvalid && (
+        {datesInvalid ? (
           <div style={{ fontSize: 12, color: 'var(--red)', marginTop: -6, marginBottom: 10 }}>
             End date is before the start date.
           </div>
+        ) : (
+          <div style={{ fontSize: 12, color: STATUS_META[preview].color, marginTop: -6, marginBottom: 10 }}>
+            {STATUS_META[preview].emoji} Will appear under "{STATUS_META[preview].section}"
+          </div>
         )}
+
         <div className="input-group">
           <div className="input-label">Cover</div>
           <div className="cat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
@@ -472,7 +653,7 @@ function NewTripModal({ onClose, onCreate }) {
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn-primary" disabled={!canCreate} onClick={submit}>
-            Create trip
+            {intent === 'dream' ? 'Start dreaming' : 'Create trip'}
           </button>
         </div>
       </div>
